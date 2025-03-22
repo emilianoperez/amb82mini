@@ -1,0 +1,24 @@
+# .gitignore
+
+# macOS metadata
+.DS_Store
+
+# PlatformIO build folder
+.pio/
+
+# VS Code settings folder
+.vscode/
+
+# Example sketches or libraries folder
+examples/
+
+# Shell script (if you don't want it in git)
+copyFilesArduino.sh
+
+# PlatformIO config file (if you prefer not to version it)
+platformio.ini
+
+# (Optional) ignore compiled objects, logs, etc.
+*.log
+*.o
+*.out
