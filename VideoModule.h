@@ -19,6 +19,7 @@ public:
     bool isStreaming() const { return _isStreaming; }
     void setRecordingDuration(uint32_t duration) { _mp4.setRecordingDuration(duration); }
     MP4Recording& getMP4Recorder() { return _mp4; }
+    VideoSetting& getVideoConfig() { return _videoConfig; }
     
 private:
     VideoSetting _videoConfig;
@@ -27,7 +28,6 @@ private:
     bool _isRecording;
     bool _isStreaming;
     String _currentFileName;
-    void _setupRTSPServer();
     void _generateFileName();
     bool _initializeSDCard();
     void _writeFrameToFile();

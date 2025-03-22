@@ -10,35 +10,51 @@ VideoModule::VideoModule()
 
 bool VideoModule::begin() {
     // Initialize camera
+    _videoConfig.setBitrate(2 * 1024 * 1024);
     Camera.configVideoChannel(VIDEO_CHANNEL, _videoConfig);
     Camera.videoInit();
     Camera.channelBegin(VIDEO_CHANNEL);
     
     // Initialize SD card
     if (!_initializeSDCard()) {
+        Serial.println("Failed to initialize SD card!");
         return false;
     }
+    Serial.println("SD card initialized successfully");
+    
     // Configure MP4 recording
     _mp4.setRecordingFileCount(1);
     _mp4.configVideo(_videoConfig);
+    
+    Serial.println("MP4 recorder initialized");
     
     return true;
 }
 
 bool VideoModule::startRecording() {
-    if (_isRecording) return false;
+    if (_isRecording) {
+        Serial.println("Recording already in progress");
+        return false;
+    }
     
     _generateFileName();
+    Serial.print("Starting recording to file: ");
+    Serial.println(_currentFileName);
+    
     _mp4.setRecordingFileName(_currentFileName);
     _mp4.configVideo(_videoConfig);
+    
+    // Start the recording
     _mp4.begin();
     _isRecording = true;
     return true;
 }
 
 bool VideoModule::stopRecording() {
-    if (!_isRecording) return false;
-    
+    if (!_isRecording) {
+        Serial.println("No recording in progress");
+        return false;
+    }
     _mp4.end();
     _isRecording = false;
     return true;
@@ -53,22 +69,14 @@ bool VideoModule::startStreaming() {
         delay(1000); // Wait for AP to start
     }
     
-    _setupRTSPServer();
     _isStreaming = true;
     return true;
 }
 
 bool VideoModule::stopStreaming() {
     if (!_isStreaming) return false;
-    
-    // TODO: Implement RTSP server stop
     _isStreaming = false;
     return true;
-}
-
-void VideoModule::_setupRTSPServer() {
-    // TODO: Implement RTSP server setup
-    // This will require additional RTSP server library implementation
 }
 
 void VideoModule::_generateFileName() {
@@ -96,8 +104,9 @@ bool VideoModule::_initializeSDCard() {
     digitalWrite(SD_CS_PIN, HIGH);
     
     if (!_fs.begin()) {
+        Serial.println("Failed to mount SD card");
         return false;
     }
-    _fs.end();
+    Serial.println("SD card mounted successfully");
     return true;
 } 

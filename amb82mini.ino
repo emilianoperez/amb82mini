@@ -4,13 +4,15 @@
 #include "PowerManager.h"
 #include "SchedulerModule.h"
 #include "StreamIO.h"
+#include "RTSP.h"
 
 // Global instances of our modules
 RTCModule rtcModule;
 VideoModule video;
 PowerManager power;
 SchedulerModule scheduler;
-StreamIO videoStreamer(1, 1);    // 1 Input Video -> 1 Output MP4
+StreamIO videoStreamer(1, 2); 
+RTSP rtsp;                   // Configuration for recording
 
 void setup() {
     Serial.begin(115200);
@@ -44,16 +46,26 @@ void setup() {
     scheduler.addSchedule(2, 16, 0, 16, 1, false, true);
     // Tue (2) from 16:01 to 16:02 - streaming and recording
     scheduler.addSchedule(2, 16, 1, 16, 2, true, true);
-
     // Tue (2) from 16:03 to 16:06 - recording only
     scheduler.addSchedule(2, 16, 3, 16, 6, true, false);
     
-    // Configure StreamIO pipeline for video recording
+    // Configure RTSP with streaming configuration
+    rtsp.configVideo(video.getVideoConfig());
+    
+    // Set up StreamIO pipeline with separate channels
     videoStreamer.registerInput(Camera.getStream(VIDEO_CHANNEL));
-    videoStreamer.registerOutput(video.getMP4Recorder());
+    
+    // Set up recording pipeline (first output)
+    videoStreamer.registerOutput1(video.getMP4Recorder());
+    
+    // Set up streaming pipeline (second output)
+    videoStreamer.registerOutput2(rtsp);
+    
+    // Start the StreamIO pipeline
     if (videoStreamer.begin() != 0) {
         Serial.println("StreamIO link start failed");
     }
+
     
     Serial.println("System initialized successfully!");
 }
@@ -77,7 +89,6 @@ void loop() {
     
     // Handle recording state
     if (shouldBeRecording && !isRecording) {
-
         // Calculate duration in seconds from current schedule
         uint32_t duration = scheduler.getCurrentScheduleDuration();
         video.setRecordingDuration(duration);
@@ -97,14 +108,24 @@ void loop() {
     if (shouldBeStreaming && !isStreaming) {
         if (power.isPowerOK()) {
             power.setWiFiEnabled(true);
+           
             if (video.startStreaming()) {
-                Serial.println("Streaming started");
+                 // Start RTSP streaming
+                rtsp.begin();
+                Serial.println("RTSP streaming started");
                 isStreaming = true;
+                // Print RTSP URL
+                IPAddress ip = WiFi.localIP();
+                Serial.print("RTSP URL: rtsp://");
+                Serial.print(ip);
+                Serial.print(":");
+                Serial.println(rtsp.getPort());
             }
         }
     } else if (!shouldBeStreaming && isStreaming) {
+        rtsp.end();
         if (video.stopStreaming()) {
-            Serial.println("Streaming stopped");
+            Serial.println("RTSP streaming stopped");
             isStreaming = false;
             // Only disable WiFi if we're not recording
             if (!isRecording) {
