@@ -36,10 +36,14 @@ void RTCModule::getDateTime(uint16_t &year, uint8_t &month, uint8_t &day,
 }
 
 uint8_t RTCModule::getDayOfWeek() {
-    struct tm* timeinfo;
-    time_t now = rtc.Read();
-    timeinfo = localtime(&now);
-    return timeinfo->tm_wday; 
+    if (!_isRunning) return 0;
+    
+    long long currentEpoch = rtc.Read();
+    _timeinfo = localtime(&currentEpoch);
+    
+    // Convert from 0=Sunday to 1=Monday format
+    uint8_t dayOfWeek = _timeinfo->tm_wday;
+    return (dayOfWeek == 0) ? 7 : dayOfWeek;  // Convert Sunday from 0 to 7
 }
 
 bool RTCModule::setAlarm(uint8_t hour, uint8_t minute) {

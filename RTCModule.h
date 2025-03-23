@@ -13,7 +13,7 @@ public:
                     uint8_t hour, uint8_t minute, uint8_t second);
     void getDateTime(uint16_t &year, uint8_t &month, uint8_t &day,
                     uint8_t &hour, uint8_t &minute, uint8_t &second);
-    uint8_t getDayOfWeek();
+    uint8_t getDayOfWeek();  // Returns 1=Monday, 2=Tuesday, ..., 7=Sunday
     bool setAlarm(uint8_t hour, uint8_t minute);
     void clearAlarm();
     bool isAlarmTriggered();

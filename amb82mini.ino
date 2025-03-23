@@ -5,6 +5,7 @@
 #include "SchedulerModule.h"
 #include "StreamIO.h"
 #include "RTSP.h"
+#include "NTPModule.h"
 
 // Global instances of our modules
 RTCModule rtcModule;
@@ -12,7 +13,8 @@ VideoModule video;
 PowerManager power;
 SchedulerModule scheduler;
 StreamIO videoStreamer(1, 2); 
-RTSP rtsp;                   // Configuration for recording
+RTSP rtsp;
+NTPModule ntpModule;
 
 void setup() {
     Serial.begin(115200);
@@ -33,21 +35,15 @@ void setup() {
         Serial.println("Failed to initialize Power Manager!");
         while (1) delay(1000);
     }
-    
-    // Set initial date/time (should be done only once)
-    // In production, this should be done through a configuration interface
-    rtcModule.setDateTime(2025, 3, 18, 16, 0, 0);
+
+    // Initialize NTP module
+    if (!ntpModule.begin()) {
+        Serial.println("Failed to initialize NTP module!");
+        while (1) delay(1000);
+    }
     
     // Set up recording schedules
     scheduler.begin();
-    
-    // Example schedules:
-    // Tue (2) from 16:00 to 16:01 - streaming only
-    scheduler.addSchedule(2, 16, 0, 16, 1, false, true);
-    // Tue (2) from 16:01 to 16:02 - streaming and recording
-    scheduler.addSchedule(2, 16, 1, 16, 2, true, true);
-    // Tue (2) from 16:03 to 16:06 - recording only
-    scheduler.addSchedule(2, 16, 3, 16, 6, true, false);
     
     // Configure RTSP with streaming configuration
     rtsp.configVideo(video.getVideoConfig());
@@ -66,6 +62,75 @@ void setup() {
         Serial.println("StreamIO link start failed");
     }
 
+    power.setWiFiEnabled(true);
+    delay(1000);
+
+    // Try to sync time with NTP server
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("WiFi Connected!");
+        if (ntpModule.syncTime()) {
+            Serial.println("Time synchronized with NTP server");
+            // Get and print the current time
+            uint16_t year;
+            uint8_t month, day, hour, minute, second;
+            rtcModule.getDateTime(year, month, day, hour, minute, second);
+            
+            Serial.print("Current time: ");
+            Serial.print(year);
+            Serial.print("-");
+            if (month < 10) Serial.print("0");
+            Serial.print(month);
+            Serial.print("-");
+            if (day < 10) Serial.print("0");
+            Serial.print(day);
+            Serial.print(" ");
+            if (hour < 10) Serial.print("0");
+            Serial.print(hour);
+            Serial.print(":");
+            if (minute < 10) Serial.print("0");
+            Serial.print(minute);
+            Serial.print(":");
+            if (second < 10) Serial.print("0");
+            Serial.println(second);
+
+            // Get current day of week (1=Monday, 2=Tuesday, ..., 7=Sunday)
+            uint8_t currentDay = rtcModule.getDayOfWeek();
+            Serial.print("Current day of week: ");
+            Serial.println(currentDay);
+
+            // Set up schedules for the current day
+            //streaming only
+            scheduler.addSchedule(currentDay, hour, minute, hour, minute +1, false, true);
+            //streaming and recording
+            scheduler.addSchedule(currentDay, hour, minute +1, hour, minute +2, true, true);
+            //recording only
+            scheduler.addSchedule(currentDay, hour, minute +3, hour, minute +6, true, false);
+            //streaming only
+            scheduler.addSchedule(currentDay, hour, minute +7, hour, minute +14, false, true);
+
+        } else {
+            Serial.println("Failed to sync time with NTP server");
+            // Set a default time as fallback
+            rtcModule.setDateTime(2025, 3, 18, 16, 0, 0);
+
+            // Tue (2) from 16:00 to 16:01 - streaming only
+            scheduler.addSchedule(2, 16, 0, 16, 1, false, true);
+            // Tue (2) from 16:01 to 16:02 - streaming and recording
+            scheduler.addSchedule(2, 16, 1, 16, 2, true, true);
+            // Tue (2) from 16:03 to 16:06 - recording only
+            scheduler.addSchedule(2, 16, 3, 16, 6, true, false);
+        }
+    } else {
+        Serial.println("WiFi not connected, using default time");
+        rtcModule.setDateTime(2025, 3, 18, 16, 0, 0);
+
+         // Tue (2) from 16:00 to 16:01 - streaming only
+        scheduler.addSchedule(2, 16, 0, 16, 1, false, true);
+        // Tue (2) from 16:01 to 16:02 - streaming and recording
+        scheduler.addSchedule(2, 16, 1, 16, 2, true, true);
+        // Tue (2) from 16:03 to 16:06 - recording only
+        scheduler.addSchedule(2, 16, 3, 16, 6, true, false);
+    }
     
     Serial.println("System initialized successfully!");
 }
@@ -127,10 +192,7 @@ void loop() {
         if (video.stopStreaming()) {
             Serial.println("RTSP streaming stopped");
             isStreaming = false;
-            // Only disable WiFi if we're not recording
-            if (!isRecording) {
-                power.setWiFiEnabled(false);
-            }
+            power.setWiFiEnabled(false);
         }
     }
     
